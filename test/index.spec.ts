@@ -94,6 +94,14 @@ describe('stripPreamble', () => {
 		expect(stripPreamble('Of course is an odd way to start a T-score report.')).toBe('is an odd way to start a T-score report.');
 	});
 
+	it('drops a bare "here is" paragraph but keeps one that introduces a list', () => {
+		expect(stripPreamble('Here is a nutritional estimate for your meal.\n\n### Components')).toBe('### Components');
+		const introducesList = 'Here are the items:\n\n- eggs';
+		expect(stripPreamble(introducesList)).toBe(introducesList);
+		const sameLine = 'Here is the summary. Calories: 480 kcal.';
+		expect(stripPreamble(sameLine)).toBe(sameLine);
+	});
+
 	it('never returns an empty string', () => {
 		expect(stripPreamble('Of course.')).toBe('Of course.');
 	});

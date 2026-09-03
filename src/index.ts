@@ -66,9 +66,14 @@ function toMessages(body: AppRequest): ChatMessage[] | null {
 // so the acknowledgement is stripped here. Only a leading filler sentence goes; the answer itself is untouched.
 const PREAMBLE = /^(of course|sure|certainly|absolutely|no problem|got it)\b[!.,]*\s*(here(?:'s| is| are)[^\n.!?]*[.!:]?\s*)?/i;
 
+// A bare "Here is ..." opener only counts as filler when it is its own paragraph ending in a period;
+// "Here are the items:" introduces the list that follows, so it stays.
+const LEAD_IN = /^here(?:'s| is| are)\b[^\n]*[.!]\s*\n\s*\n/i;
+
 export function stripPreamble(text: string): string {
-	const stripped = text.replace(PREAMBLE, '').trimStart();
-	return stripped.length > 0 ? stripped : text;
+	let out = text.replace(PREAMBLE, '').trimStart();
+	if (out === text) out = text.replace(LEAD_IN, '').trimStart();
+	return out.length > 0 ? out : text;
 }
 
 function hasImage(messages: ChatMessage[]): boolean {
