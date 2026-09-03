@@ -65,6 +65,61 @@ curl -X POST $BASE/food -H "x-app-token: $TOKEN" -H "Content-Type: application/j
   -d "{\"text\":\"Estimate this meal\",\"image\":\"$IMG\"}"
 ```
 
+## Example answer
+
+Real response from the deployed Worker for the `POST /dexa` call above (version `ff8360c`, 718 completion tokens):
+
+```
+HTTP/2 200
+x-worker-version: ff8360c
+x-feature: dexa
+x-model: dots-studio/dots-3-note-preview:free
+```
+
+```json
+{
+  "feature": "dexa",
+  "model": "dots-studio/dots-3-note-preview:free",
+  "answer": "### Understanding Your Scores\n\n1.  **T-score: -2.6 at the Lumbar Spine** …",
+  "finish_reason": "stop",
+  "usage": { "prompt_tokens": 128, "completion_tokens": 718, "total_tokens": 846, "cost": 0 },
+  "fallbacks_tried": []
+}
+```
+
+<details>
+<summary>The <code>answer</code> field, rendered</summary>
+
+### Understanding Your Scores
+
+Your report provides two key numbers:
+
+1.  **T-score: -2.6 at the Lumbar Spine**
+    *   **What it means:** This score compares your bone density to that of a healthy, young adult (the peak bone density you would have had around age 30). A T-score of 0 is ideal. Each point below 0 represents one standard deviation weaker bone density.
+    *   **Classification:** According to the World Health Organization (WHO) guidelines, a T-score of **-2.5 or lower is classified as osteoporosis**. Your score of -2.6 falls into this category.
+
+2.  **Z-score: -1.8**
+    *   **What it means:** This score compares your bone density to others of the same age, sex, and body size. It helps see if your bone density is typical for someone your age.
+    *   **Classification:** A Z-score above -2.0 is generally considered within the expected range for age. Your score of -1.8 is in the **normal range** for your age group.
+
+### Putting It Together
+
+The combination of these scores is informative. It suggests that while your bone density is lower than that of a young adult (indicating osteoporosis), it is still within the typical range for people of your own age. This pattern can be common and is often related to the natural, gradual bone loss that occurs with aging.
+
+### Questions to Ask Your Doctor
+
+It's very important to discuss these results with your doctor. Here are some sensible questions to guide your conversation:
+
+*   Based on my T-score of -2.6, what does "osteoporosis" mean for my long-term bone health?
+*   Given that my Z-score is normal for my age, what are the main factors contributing to my bone density being lower than a young adult's?
+*   What lifestyle changes (related to diet, exercise, etc.) would you recommend to help protect my bones?
+*   Are there any additional tests we should consider to get a fuller picture of my bone health?
+*   Should we discuss a plan for monitoring my bone density in the future (e.g., another scan in a year or two)?
+
+This information is for educational purposes only and is not a substitute for professional medical advice. Your doctor can interpret these results in the context of your overall health and medical history.
+
+</details>
+
 ## Run locally
 
 ```bash
