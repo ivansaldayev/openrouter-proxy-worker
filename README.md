@@ -8,6 +8,7 @@ Live demo: https://openrouter-proxy-worker.ivan01march.workers.dev/ — open it 
 
 - `GET /` — service description, deployed version, routes
 - `GET /dexa`, `GET /food` — feature description: models, key handling, privacy flag, request shape (no model call)
+- `HEAD` on any of the above mirrors the `GET` status and headers with no body, for uptime checks
 - `POST /dexa` — explains a DEXA (bone density) report from a photo or text
 - `POST /food` — estimates a meal's nutrition from a photo or description
 - Every POST must carry `x-app-token` (401 otherwise); unknown feature → 404; body over 6 MB → 413

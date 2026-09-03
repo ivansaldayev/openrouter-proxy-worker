@@ -38,6 +38,21 @@ describe('GET', () => {
 	});
 });
 
+describe('HEAD', () => {
+	it('mirrors GET status and headers, with no body', async () => {
+		const res = await call('/dexa', { method: 'HEAD' });
+		expect(res.status).toBe(200);
+		expect(res.headers.get('x-feature')).toBe('dexa');
+		expect(res.headers.get('x-worker-version')).toBe('test');
+		expect(await res.text()).toBe('');
+	});
+
+	it('keeps the 404 of an unknown path', async () => {
+		expect((await call('/zzz', { method: 'HEAD' })).status).toBe(404);
+		expect((await call('/', { method: 'HEAD' })).status).toBe(200);
+	});
+});
+
 describe('POST', () => {
 	const jsonInit = (body: unknown, token?: string): RequestInit => ({
 		method: 'POST',

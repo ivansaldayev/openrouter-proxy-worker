@@ -96,40 +96,47 @@ export default {
 		const feature = url.pathname.replace(/^\/|\/$/g, '');
 		const cfg = Object.hasOwn(FEATURES, feature) ? FEATURES[feature] : undefined;
 
-		if (request.method === 'GET') {
+		// HEAD is answered like GET with the body dropped: browsers, uptime monitors and CDNs use it
+		if (request.method === 'GET' || request.method === 'HEAD') {
+			const withoutBody = (res: Response) =>
+				request.method === 'HEAD' ? new Response(null, { status: res.status, headers: res.headers }) : res;
 			// GET / — self-description, so the link can be opened in a browser
 			if (feature === '') {
-				return json(
-					{
-						service: 'openrouter-proxy-worker',
-						version,
-						routes: Object.keys(FEATURES).map((f) => `POST /${f}`),
-						auth: 'header x-app-token',
-						body: { text: 'string', image: 'optional data:image/...;base64,...' },
-						alt_body: { messages: 'OpenAI-style messages array (user/assistant only)' },
-						note: 'Free-tier OpenRouter models; answers are illustrative, the proxy pattern is the point.',
-					},
-					200,
-					base,
+				return withoutBody(
+					json(
+						{
+							service: 'openrouter-proxy-worker',
+							version,
+							routes: Object.keys(FEATURES).map((f) => `POST /${f}`),
+							auth: 'header x-app-token',
+							body: { text: 'string', image: 'optional data:image/...;base64,...' },
+							alt_body: { messages: 'OpenAI-style messages array (user/assistant only)' },
+							note: 'Free-tier OpenRouter models; answers are illustrative, the proxy pattern is the point.',
+						},
+						200,
+						base,
+					),
 				);
 			}
 			// GET /<feature> — feature description without calling a model
 			if (cfg) {
-				return json(
-					{
-						feature,
-						version,
-						models: { primary: cfg.models[0], fallbacks: cfg.models.slice(1) },
-						key: 'OpenRouter key is a Worker secret; the app never sees it',
-						privacy: 'provider.data_collection = "deny" is set in the request body on every call',
-						auth: 'POST requires header x-app-token',
-						try: { method: 'POST', path: `/${feature}`, body: { text: '…', image: 'optional data:image/jpeg;base64,…' } },
-					},
-					200,
-					{ ...base, 'x-feature': feature },
+				return withoutBody(
+					json(
+						{
+							feature,
+							version,
+							models: { primary: cfg.models[0], fallbacks: cfg.models.slice(1) },
+							key: 'OpenRouter key is a Worker secret; the app never sees it',
+							privacy: 'provider.data_collection = "deny" is set in the request body on every call',
+							auth: 'POST requires header x-app-token',
+							try: { method: 'POST', path: `/${feature}`, body: { text: '…', image: 'optional data:image/jpeg;base64,…' } },
+						},
+						200,
+						{ ...base, 'x-feature': feature },
+					),
 				);
 			}
-			return json({ error: 'Not found', known: Object.keys(FEATURES) }, 404, base);
+			return withoutBody(json({ error: 'Not found', known: Object.keys(FEATURES) }, 404, base));
 		}
 		if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, base);
 
