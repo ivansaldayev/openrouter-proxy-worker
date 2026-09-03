@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy --var VERSION:$(git rev-parse --short HEAD)",
+    "deploy": "node scripts/deploy.mjs",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",

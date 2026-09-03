@@ -10,9 +10,9 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": {
-    "enabled": true,
+    "enabled": true
   },
-  "upload_source_maps": true,
+  "upload_source_maps": true
   // VERSION is passed at deploy time: wrangler deploy --var VERSION:<short git sha> (see npm run deploy).
   // Secrets OPENROUTER_KEY and APP_TOKEN: .dev.vars locally, wrangler secret put in production.
 }

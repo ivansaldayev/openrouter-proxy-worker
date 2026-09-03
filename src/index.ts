@@ -12,7 +12,7 @@ type AppRequest = { messages?: ChatMessage[]; text?: string; image?: string };
 type FeatureConfig = {
   models: string[]; // first is primary, the rest are fallbacks (tried on 402/403/404/429/5xx, empty answer, or truncation)
   system: string;
-  maxTokens: number;
+  maxTokens: number; // covers reasoning tokens too: dots-3 spends up to ~1000 of them before writing a word
 };
 
 // One place to edit for all features: adding a feature = adding an entry.
@@ -26,7 +26,7 @@ const FEATURES: Record<string, FeatureConfig> = {
       'Explain T-score and Z-score values in plain language, say which range they fall into (normal, osteopenia, osteoporosis) ' +
       'according to standard WHO thresholds, and list sensible questions to ask their doctor. ' +
       'Do not diagnose or recommend medication. Be concise and calm. Start with the substance: never open with "Of course", "Sure", "Certainly" or a restatement of the request.',
-    maxTokens: 1500,
+    maxTokens: 2500,
   },
   food: {
     models: ['dots-studio/dots-3-note-preview:free', 'nvidia/nemotron-3.5-lightning:free'],
@@ -34,7 +34,7 @@ const FEATURES: Record<string, FeatureConfig> = {
       'You estimate the nutritional content of a meal from a photo or a description. ' +
       'List the likely items with approximate portions, then give rough calories, protein, carbs, fat and calcium, ' +
       'and state clearly that these are estimates. Keep it short and structured. Start with the substance: never open with "Of course", "Sure", "Certainly" or a restatement of the request.',
-    maxTokens: 1500,
+    maxTokens: 2500,
   },
 };
 
@@ -49,17 +49,64 @@ const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...extra },
   });
 
-function toMessages(body: AppRequest): ChatMessage[] | null {
+function isContentPart(part: unknown): part is ContentPart {
+  if (typeof part !== 'object' || part === null) return false;
+  const p = part as { type?: unknown; text?: unknown; image_url?: unknown };
+  if (p.type === 'text') return typeof p.text === 'string';
+  if (p.type === 'image_url') {
+    const url = (p.image_url as { url?: unknown } | undefined)?.url;
+    return typeof url === 'string';
+  }
+  return false;
+}
+
+function isChatMessage(message: unknown): message is ChatMessage {
+  if (typeof message !== 'object' || message === null) return false;
+  const m = message as { role?: unknown; content?: unknown };
+  if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') return false;
+  if (typeof m.content === 'string') return true;
+  return Array.isArray(m.content) && m.content.length > 0 && m.content.every(isContentPart);
+}
+
+type Parsed = { messages: ChatMessage[] } | { error: string };
+
+function toMessages(body: AppRequest): Parsed {
   if (Array.isArray(body.messages) && body.messages.length > 0) {
+    if (!body.messages.every(isChatMessage)) {
+      return { error: 'Each message needs role user/assistant and a string content or a list of {type:"text"|"image_url"} parts' };
+    }
     // the system prompt is owned by the Worker; a client must not be able to replace it
-    return body.messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+    const messages = body.messages.filter((m) => m.role !== 'system');
+    // dropping the client's system messages can empty the list — that is a bad request, not a call with no user turn
+    if (messages.length === 0) return { error: 'Provide at least one user or assistant message' };
+    return { messages };
   }
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   const image = typeof body.image === 'string' && body.image.startsWith('data:image/') ? body.image : null;
-  if (!text && !image) return null;
+  if (!text && !image) return { error: 'Provide { text, image? } or { messages[] }' };
   const parts: ContentPart[] = [{ type: 'text', text: text || 'Describe what you see and answer accordingly.' }];
   if (image) parts.push({ type: 'image_url', image_url: { url: image } });
-  return [{ role: 'user', content: parts }];
+  return { messages: [{ role: 'user', content: parts }] };
+}
+
+// A short, safe summary of the upstream error for the client: message only, truncated, with anything
+// key-shaped or URL-shaped removed, so a provider echoing our request cannot leak the OpenRouter key.
+function upstreamDetail(error: unknown): string | undefined {
+  const message = (error as { message?: unknown } | undefined)?.message;
+  if (typeof message !== 'string') return undefined;
+  return message
+    .replace(/\b(sk|or)-[A-Za-z0-9_-]{8,}/g, '[redacted]')
+    .replace(/https?:\/\/\S+/g, '[url]')
+    .slice(0, 200);
+}
+
+// constant-time comparison so a wrong token cannot be narrowed down byte by byte; length itself is not secret
+function tokenMatches(provided: string | null, expected: string | undefined): boolean {
+  if (!provided || !expected) return false;
+  const a = new TextEncoder().encode(provided);
+  const b = new TextEncoder().encode(expected);
+  if (a.byteLength !== b.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(a, b);
 }
 
 function hasImage(messages: ChatMessage[]): boolean {
@@ -128,7 +175,7 @@ export default {
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, base);
 
     // app authentication — so the Worker is not an open proxy
-    if (request.headers.get('x-app-token') !== env.APP_TOKEN) return json({ error: 'Unauthorized' }, 401, base);
+    if (!tokenMatches(request.headers.get('x-app-token'), env.APP_TOKEN)) return json({ error: 'Unauthorized' }, 401, base);
 
     if (!cfg) return json({ error: `Unknown feature: ${feature}`, known: Object.keys(FEATURES) }, 404, base);
 
@@ -143,10 +190,10 @@ export default {
     } catch {
       return json({ error: 'Invalid JSON' }, 400, base);
     }
-    const userMessages = toMessages(body);
-    if (!userMessages) return json({ error: 'Provide { text, image? } or { messages[] }' }, 400, base);
+    const parsed = toMessages(body);
+    if ('error' in parsed) return json({ error: parsed.error }, 400, base);
 
-    const messages: ChatMessage[] = [{ role: 'system', content: cfg.system }, ...userMessages];
+    const messages: ChatMessage[] = [{ role: 'system', content: cfg.system }, ...parsed.messages];
     const withImage = hasImage(messages);
     const candidates = cfg.models.filter((m) => !(withImage && TEXT_ONLY.has(m)));
 
@@ -167,7 +214,7 @@ export default {
             model,
             messages,
             max_tokens: cfg.maxTokens,
-            reasoning: { effort: 'low', exclude: true }, // reasoning models otherwise burn the token budget before answering
+            reasoning: { exclude: true }, // keep the reasoning out of the answer; effort: 'low' is ignored by dots-3, so budget for it in maxTokens instead
             provider: { data_collection: 'deny' }, // zero-data-retention in the request body, not in a dashboard setting
           }),
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -194,11 +241,21 @@ export default {
       if (!upstream.ok || data.error) {
         // do not forward upstream 400/401 as-is: the app would confuse "my token is wrong" with "the Worker's key is wrong"
         console.log(JSON.stringify({ feature, model, upstream_status: upstream.status, error: data.error }));
-        return json({ error: 'Upstream error', upstream_status: upstream.status, model, fallbacks_tried: attempts }, 502, {
-          ...base,
-          'x-feature': feature,
-          'x-model': model,
-        });
+        return json(
+          {
+            error: 'Upstream error',
+            upstream_status: upstream.status,
+            model,
+            detail: upstreamDetail(data.error),
+            fallbacks_tried: attempts,
+          },
+          502,
+          {
+            ...base,
+            'x-feature': feature,
+            'x-model': model,
+          },
+        );
       }
 
       const choice = data.choices?.[0];
