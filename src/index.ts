@@ -197,7 +197,7 @@ export default {
     const withImage = hasImage(messages);
     const candidates = cfg.models.filter((m) => !(withImage && TEXT_ONLY.has(m)));
 
-    const attempts: Array<{ model: string; status: number; reason: string; ms: number }> = [];
+    const attempts: Array<{ model: string; status: number; reason: string; detail?: string; ms: number }> = [];
     for (const model of candidates) {
       const started = Date.now();
       let upstream: Response;
@@ -239,23 +239,18 @@ export default {
         continue;
       }
       if (!upstream.ok || data.error) {
-        // do not forward upstream 400/401 as-is: the app would confuse "my token is wrong" with "the Worker's key is wrong"
+        // An error here is about this model, not the request as a whole: OpenRouter answers 400
+        // "not a valid model ID" for a retired model, so give the next candidate a turn. If every
+        // model fails, the loop ends with 502 carrying these per-model details.
         console.log(JSON.stringify({ feature, model, upstream_status: upstream.status, error: data.error }));
-        return json(
-          {
-            error: 'Upstream error',
-            upstream_status: upstream.status,
-            model,
-            detail: upstreamDetail(data.error),
-            fallbacks_tried: attempts,
-          },
-          502,
-          {
-            ...base,
-            'x-feature': feature,
-            'x-model': model,
-          },
-        );
+        attempts.push({
+          model,
+          status: upstream.status,
+          reason: 'upstream error',
+          detail: upstreamDetail(data.error),
+          ms: Date.now() - started,
+        });
+        continue;
       }
 
       const choice = data.choices?.[0];
@@ -282,6 +277,7 @@ export default {
       });
     }
 
+    // never forward an upstream 400/401 as-is: the app would confuse "my token is wrong" with "the Worker's key is wrong"
     console.log(JSON.stringify({ feature, error: 'all models failed', attempts }));
     return json({ error: 'All models unavailable', fallbacks_tried: attempts }, 502, { ...base, 'x-feature': feature });
   },
