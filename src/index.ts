@@ -25,7 +25,7 @@ const FEATURES: Record<string, FeatureConfig> = {
 			'You help a person understand a DEXA (bone density) scan report. ' +
 			'Explain T-score and Z-score values in plain language, say which range they fall into (normal, osteopenia, osteoporosis) ' +
 			'according to standard WHO thresholds, and list sensible questions to ask their doctor. ' +
-			'Do not diagnose or recommend medication. Be concise and calm. Answer directly, without preamble.',
+			'Do not diagnose or recommend medication. Be concise and calm. Start with the substance: never open with "Of course", "Sure", "Certainly" or a restatement of the request.',
 		maxTokens: 1500,
 	},
 	food: {
@@ -33,7 +33,7 @@ const FEATURES: Record<string, FeatureConfig> = {
 		system:
 			'You estimate the nutritional content of a meal from a photo or a description. ' +
 			'List the likely items with approximate portions, then give rough calories, protein, carbs, fat and calcium, ' +
-			'and state clearly that these are estimates. Keep it short and structured. Answer directly, without preamble.',
+			'and state clearly that these are estimates. Keep it short and structured. Start with the substance: never open with "Of course", "Sure", "Certainly" or a restatement of the request.',
 		maxTokens: 1500,
 	},
 };
