@@ -87,7 +87,8 @@ type UpstreamResponse = {
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  // ctx is unused today: every response is awaited before returning, nothing runs after the response
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const version = env.VERSION ?? 'dev';
     const base = { 'x-worker-version': version };
