@@ -3,16 +3,16 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "openrouter-proxy-worker",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-08-31",
-	"workers_dev": true,
-	"preview_urls": false,
-	"observability": {
-		"enabled": true
-	},
-	"upload_source_maps": true
-	// VERSION is passed at deploy time: wrangler deploy --var VERSION:<short git sha> (see npm run deploy).
-	// Secrets OPENROUTER_KEY and APP_TOKEN: .dev.vars locally, wrangler secret put in production.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openrouter-proxy-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-31",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+  },
+  "upload_source_maps": true,
+  // VERSION is passed at deploy time: wrangler deploy --var VERSION:<short git sha> (see npm run deploy).
+  // Secrets OPENROUTER_KEY and APP_TOKEN: .dev.vars locally, wrangler secret put in production.
 }
