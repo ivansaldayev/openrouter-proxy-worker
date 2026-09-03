@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `wrangler dev` (.dev.vars is git-ignored).
+
+# OpenRouter API key — never shipped to the client, set as a Wrangler secret in production.
+OPENROUTER_KEY=sk-or-...
+
+# Shared token the app sends in the x-app-token header; requests without it get 401.
+APP_TOKEN=
+
+# Reported as x-worker-version; on deploy it is passed as --var VERSION:$(git rev-parse --short HEAD).
+VERSION=dev

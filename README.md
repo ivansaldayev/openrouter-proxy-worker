@@ -65,9 +65,7 @@ curl -X POST $BASE/food -H "x-app-token: $TOKEN" -H "Content-Type: application/j
 
 ```bash
 npm install
-# .dev.vars (git-ignored):
-#   OPENROUTER_KEY=sk-or-...
-#   APP_TOKEN=...
+cp .dev.vars.example .dev.vars   # then fill in OPENROUTER_KEY and APP_TOKEN
 npx wrangler dev          # http://localhost:8787
 ```
 
