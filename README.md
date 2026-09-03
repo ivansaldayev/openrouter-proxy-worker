@@ -15,6 +15,7 @@ Live demo: https://openrouter-proxy-worker.ivan01march.workers.dev/ — open it 
 - Provider privacy flag is set in the request body (`provider.data_collection: "deny"`), not in a dashboard setting
 - Per-feature model list with fallback on 402/403/404/429/5xx, timeouts, non-JSON bodies, empty or truncated answers; text-only models are skipped when the request contains an image
 - The system prompt is owned by the Worker: `system` messages from the client are dropped
+- A leading "Of course. Here is…" acknowledgement is stripped from the answer — free-tier models add it regardless of the system prompt
 - Every response carries `x-worker-version` (git commit at deploy); responses from a model also carry `x-model`, and `fallbacks_tried` lists what was skipped and why
 
 Models are OpenRouter free tier (`dots-studio/dots-3-note-preview:free` for text and images, `nvidia/nemotron-3.5-lightning:free` text-only fallback). Answers are illustrative and take 3–8 s — the proxy pattern is the point, and an app should show a progress indicator.

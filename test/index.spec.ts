@@ -1,6 +1,6 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import worker from '../src/index';
+import worker, { stripPreamble } from '../src/index';
 
 // No network in these tests: they cover routing, auth and validation — everything before the OpenRouter call.
 const testEnv = { ...env, APP_TOKEN: 'test-token', OPENROUTER_KEY: 'unused', VERSION: 'test' } as Env;
@@ -78,5 +78,23 @@ describe('other methods', () => {
 	it('are 405', async () => {
 		expect((await call('/food', { method: 'PUT' })).status).toBe(405);
 		expect((await call('/', { method: 'DELETE' })).status).toBe(405);
+	});
+});
+
+describe('stripPreamble', () => {
+	it('drops a leading acknowledgement and its "here is" sentence', () => {
+		expect(stripPreamble('Of course. Here is a plain-language explanation.\n\nYour T-score...')).toBe('Your T-score...');
+		expect(stripPreamble('Sure! Here are the estimates:\n- eggs')).toBe('- eggs');
+		expect(stripPreamble('Certainly. Your T-score is low.')).toBe('Your T-score is low.');
+	});
+
+	it('leaves a real answer alone', () => {
+		const answer = '**Estimated Meal Breakdown**\n\n- Two eggs';
+		expect(stripPreamble(answer)).toBe(answer);
+		expect(stripPreamble('Of course is an odd way to start a T-score report.')).toBe('is an odd way to start a T-score report.');
+	});
+
+	it('never returns an empty string', () => {
+		expect(stripPreamble('Of course.')).toBe('Of course.');
 	});
 });
