@@ -1,29 +1,82 @@
-import {
-	env,
-	createExecutionContext,
-	waitOnExecutionContext,
-	SELF,
-} from "cloudflare:test";
-import { describe, it, expect } from "vitest";
-import worker from "../src/index";
+import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
+import worker from '../src/index';
 
-// For now, you'll need to do something like this to get a correctly-typed
-// `Request` to pass to `worker.fetch()`.
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
+// No network in these tests: they cover routing, auth and validation — everything before the OpenRouter call.
+const testEnv = { ...env, APP_TOKEN: 'test-token', OPENROUTER_KEY: 'unused', VERSION: 'test' } as Env;
+const BASE = 'http://example.com';
 
-describe("Hello World worker", () => {
-	it("responds with Hello World! (unit style)", async () => {
-		const request = new IncomingRequest("http://example.com");
-		// Create an empty context to pass to `worker.fetch()`.
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, env, ctx);
-		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
-		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+async function call(path: string, init?: RequestInit) {
+	const ctx = createExecutionContext();
+	const res = await worker.fetch(new Request(BASE + path, init), testEnv, ctx);
+	await waitOnExecutionContext(ctx);
+	return res;
+}
+
+describe('GET', () => {
+	it('/ describes the service and carries the version header', async () => {
+		const res = await call('/');
+		expect(res.status).toBe(200);
+		expect(res.headers.get('x-worker-version')).toBe('test');
+		const body = (await res.json()) as { routes: string[]; version: string };
+		expect(body.version).toBe('test');
+		expect(body.routes).toEqual(['POST /dexa', 'POST /food']);
 	});
 
-	it("responds with Hello World! (integration style)", async () => {
-		const response = await SELF.fetch("https://example.com");
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+	it('/dexa describes the feature without calling a model', async () => {
+		const res = await call('/dexa');
+		expect(res.status).toBe(200);
+		expect(res.headers.get('x-feature')).toBe('dexa');
+		const body = (await res.json()) as { models: { primary: string } };
+		expect(body.models.primary).toContain('/');
+	});
+
+	it('unknown path is 404, prototype keys are not features', async () => {
+		expect((await call('/zzz')).status).toBe(404);
+		expect((await call('/constructor')).status).toBe(404);
+		expect((await call('/__proto__')).status).toBe(404);
+	});
+});
+
+describe('POST', () => {
+	const jsonInit = (body: unknown, token?: string): RequestInit => ({
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...(token ? { 'x-app-token': token } : {}) },
+		body: JSON.stringify(body),
+	});
+
+	it('rejects a missing or wrong token before anything else', async () => {
+		expect((await call('/food', jsonInit({ text: 'hi' }))).status).toBe(401);
+		expect((await call('/food', jsonInit({ text: 'hi' }, 'wrong'))).status).toBe(401);
+		expect((await call('/nope', jsonInit({ text: 'hi' }, 'wrong'))).status).toBe(401);
+	});
+
+	it('returns 404 with the known features for an unknown feature', async () => {
+		const res = await call('/nope', jsonInit({ text: 'hi' }, 'test-token'));
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as { known: string[] };
+		expect(body.known).toEqual(['dexa', 'food']);
+	});
+
+	it('validates the body', async () => {
+		expect((await call('/food', jsonInit({}, 'test-token'))).status).toBe(400);
+		const bad = await call('/food', { method: 'POST', headers: { 'x-app-token': 'test-token' }, body: '{not json' });
+		expect(bad.status).toBe(400);
+	});
+
+	it('refuses oversized bodies up front', async () => {
+		const res = await call('/food', {
+			method: 'POST',
+			headers: { 'x-app-token': 'test-token', 'content-length': String(7 * 1024 * 1024) },
+			body: '{}',
+		});
+		expect(res.status).toBe(413);
+	});
+});
+
+describe('other methods', () => {
+	it('are 405', async () => {
+		expect((await call('/food', { method: 'PUT' })).status).toBe(405);
+		expect((await call('/', { method: 'DELETE' })).status).toBe(405);
 	});
 });

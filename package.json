@@ -3,10 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --var VERSION:$(git rev-parse --short HEAD)",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
+    "check": "tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
