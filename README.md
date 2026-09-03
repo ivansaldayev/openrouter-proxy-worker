@@ -2,7 +2,7 @@
 
 A small Cloudflare Worker that keeps an LLM API key on the server side for a mobile app, so the key never ships in the app binary. Built as a working demo of the pattern: one Worker, several AI features, shared auth and forwarding, per-feature model config.
 
-Live demo: https://my-first-worker.ivan01march.workers.dev/ — open it in a browser for the route list; `/dexa` and `/food` describe each feature in the browser too. POST (the actual model call) needs the app token.
+Live demo: https://openrouter-proxy-worker.ivan01march.workers.dev/ — open it in a browser for the route list; `/dexa` and `/food` describe each feature in the browser too. POST (the actual model call) needs the app token.
 
 ## What it does
 
@@ -41,7 +41,7 @@ Response:
 ## Try it
 
 ```bash
-BASE=https://my-first-worker.ivan01march.workers.dev
+BASE=https://openrouter-proxy-worker.ivan01march.workers.dev
 TOKEN=...   # the app token
 
 curl -i $BASE/                                     # 200, route list, x-worker-version
