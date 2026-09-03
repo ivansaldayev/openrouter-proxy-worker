@@ -62,20 +62,6 @@ function toMessages(body: AppRequest): ChatMessage[] | null {
   return [{ role: 'user', content: parts }];
 }
 
-// Free-tier models keep opening with "Of course. Here is ..." however the system prompt is worded,
-// so the acknowledgement is stripped here. Only a leading filler sentence goes; the answer itself is untouched.
-const PREAMBLE = /^(of course|sure|certainly|absolutely|no problem|got it)\b[!.,]*\s*(here(?:'s| is| are)[^\n.!?]*[.!:]?\s*)?/i;
-
-// A bare "Here is ..." opener only counts as filler when it is its own paragraph ending in a period;
-// "Here are the items:" introduces the list that follows, so it stays.
-const LEAD_IN = /^here(?:'s| is| are)\b[^\n]*[.!]\s*\n\s*\n/i;
-
-export function stripPreamble(text: string): string {
-  let out = text.replace(PREAMBLE, '').trimStart();
-  if (out === text) out = text.replace(LEAD_IN, '').trimStart();
-  return out.length > 0 ? out : text;
-}
-
 function hasImage(messages: ChatMessage[]): boolean {
   return messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image_url'));
 }
@@ -216,13 +202,16 @@ export default {
       }
 
       const choice = data.choices?.[0];
-      const answer = stripPreamble((choice?.message?.content ?? '').trim());
-      if (!answer || choice?.finish_reason === 'length') {
+      // the model's text is passed through verbatim — never trimmed, stripped or rewritten
+      const content = choice?.message?.content;
+      const answer = typeof content === 'string' ? content : '';
+      const blank = answer.trim().length === 0;
+      if (blank || choice?.finish_reason === 'length') {
         // an empty or truncated answer is a failure, not a 200
         attempts.push({
           model,
           status: upstream.status,
-          reason: answer ? 'truncated (finish_reason=length)' : 'empty answer',
+          reason: blank ? 'empty answer' : 'truncated (finish_reason=length)',
           ms: Date.now() - started,
         });
         continue;

@@ -34,8 +34,8 @@ Invariants worth preserving:
 - `Object.hasOwn` guards the feature lookup. Plain `FEATURES[feature]` returns `Object.prototype` members, which made `/constructor` and `/__proto__` throw 500.
 - HEAD is answered like GET through `withoutBody()`, mirroring status and headers with no body.
 - The system prompt belongs to the Worker: `toMessages()` drops any `role: 'system'` message sent by the client.
-- `stripPreamble()` (exported for tests) removes a leading "Of course. Here is…" acknowledgement, and a bare "Here is …" paragraph that ends in a period. A "Here are the items:" line introduces the list that follows and must survive. It never returns an empty string.
 - `TEXT_ONLY` models are filtered out when the request carries an image.
+- The model's text is returned verbatim: never trimmed, stripped or rewritten. A non-string `content` counts as empty and falls through to the next model.
 
 ## Deploy invariant
 
@@ -68,11 +68,13 @@ The workers.dev hostname comes from `name` in `wrangler.jsonc`, not the director
 
 Free-tier OpenRouter: `dots-studio/dots-3-note-preview:free` (text + images) with `nvidia/nemotron-3.5-lightning:free` (text-only) as fallback. `thinkingmachines/inkling-small:free` is listed by the API but gated to "agentic harnesses" and returns 403 — do not add it back.
 
-Two model behaviours are already worked around and will come back if the workaround is removed: reasoning models burn the whole token budget before answering unless `reasoning: { effort: 'low', exclude: true }` is sent, and the model opens with "Of course. Here is…" no matter how the system prompt is worded, which is why the fix is `stripPreamble()` and not more prompt text.
+Reasoning models burn the whole token budget before answering unless `reasoning: { effort: 'low', exclude: true }` is sent — keep it.
+
+These models also like to open with "Of course. Here is…" regardless of the system prompt. A regex that stripped that opener used to live here; it was removed because it mangled real answers (`Here is your T-score: -2.6` lost its number). Do not reintroduce string surgery on model output — if the preamble matters, fix it in the prompt or leave it.
 
 ## Conventions
 
-Prettier config is authoritative: 2 spaces, single quotes, semicolons, 140 columns. Comments in `src/` are in English and explain *why*, not what. Tests are network-free and cover routing, auth, validation and `stripPreamble`; live model calls are checked by hand with curl after a deploy.
+Prettier config is authoritative: 2 spaces, single quotes, semicolons, 140 columns. Comments in `src/` are in English and explain *why*, not what. Tests are network-free and cover routing, auth and validation; live model calls are checked by hand with curl after a deploy.
 
 Import `env` from `cloudflare:workers` in tests — the `cloudflare:test` export of the same name is deprecated, as is `SELF`.
 
